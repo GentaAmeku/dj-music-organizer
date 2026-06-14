@@ -38,6 +38,10 @@ DJ Music/
     UnknownBPM/
   90_Archive/
   playlists/
+    BPM/
+      Under100.m3u8
+      100-109.m3u8
+      ...
   reports/
 ```
 
@@ -171,6 +175,41 @@ Use two future Codex skills:
 - `dj-transition-suggest`: use `organizer_log.jsonl`, BPM, Camelot key, source hint, and paths to suggest transition candidates.
 - `dj-source-playlists`: generate source-hint playlists from `organizer_log.jsonl`.
 
+### BPM playlists
+
+rekordbox may not preserve the physical `01_Analyzed/{BPMRange}` folder hierarchy as a browsable playlist tree. To make BPM browsing explicit, generate one `.m3u8` per BPM folder:
+
+```text
+DJ Music/playlists/BPM/Under100.m3u8
+DJ Music/playlists/BPM/100-109.m3u8
+DJ Music/playlists/BPM/110-119.m3u8
+DJ Music/playlists/BPM/120-124.m3u8
+DJ Music/playlists/BPM/125-128.m3u8
+DJ Music/playlists/BPM/129-132.m3u8
+DJ Music/playlists/BPM/133-139.m3u8
+DJ Music/playlists/BPM/140-159.m3u8
+DJ Music/playlists/BPM/160-169.m3u8
+DJ Music/playlists/BPM/170-179.m3u8
+DJ Music/playlists/BPM/180-189.m3u8
+DJ Music/playlists/BPM/190-199.m3u8
+DJ Music/playlists/BPM/200-209.m3u8
+DJ Music/playlists/BPM/210-219.m3u8
+DJ Music/playlists/BPM/220plus.m3u8
+DJ Music/playlists/BPM/UnknownBPM.m3u8
+```
+
+The actual list of BPM playlists comes from `dj_music_organizer.config.json` `bpm_ranges`, so BPM values at `180` and above are analyzed, placed, and exported without changing the script.
+
+BPM playlists are generated from the filesystem under `01_Analyzed`, not from `organizer_log.jsonl`. The BPM folder is the source of truth for this view.
+
+Entries are relative to each `.m3u8` file:
+
+```text
+../../01_Analyzed/125-128/M2U - glory day_128BPM_8A.mp3
+```
+
+### Source playlists
+
 For now, provide a script that generates source-hint `.m3u8` files:
 
 ```text
@@ -207,4 +246,5 @@ USB/
   DJ Music/
     01_Analyzed/
     playlists/
+      BPM/
 ```

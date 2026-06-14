@@ -12,6 +12,7 @@ DDJ-FLX4とrekordboxで使いやすい形に音源を整理するためのロー
 - `{Artist} - {Title}_{BPM}BPM_{Camelot}.{ext}` 形式へ整理する
 - BPM帯ごとに `01_Analyzed` へコピーする
 - 元ファイルを `90_Archive` へ退避する
+- BPM帯ごとの `.m3u8` プレイリストを作る
 - `source_hint` 別の `.m3u8` プレイリストを作る
 - USBへ `01_Analyzed` と `playlists` だけを書き出す
 
@@ -58,6 +59,10 @@ DJ Music/
     UnknownBPM/
   90_Archive/
   playlists/
+    BPM/
+      Under100.m3u8
+      100-109.m3u8
+      ...
   reports/
 ```
 
@@ -109,7 +114,46 @@ cd /path/to/dj-music-organizer
 
 `--apply` でも確認プロンプトが出ます。確認なしの `--apply --yes` は、明示的に必要なときだけ使います。
 
-## プレイリスト生成
+## BPMプレイリスト生成
+
+rekordboxでBPM帯の構造をプレイリストとして読み込むため、`01_Analyzed` のBPMフォルダから `.m3u8` を生成します。
+
+```bash
+.venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --apply
+```
+
+プレイリストは以下に作られます。
+
+```text
+X:\DJ Music\playlists\BPM\Under100.m3u8
+X:\DJ Music\playlists\BPM\100-109.m3u8
+X:\DJ Music\playlists\BPM\110-119.m3u8
+X:\DJ Music\playlists\BPM\120-124.m3u8
+X:\DJ Music\playlists\BPM\125-128.m3u8
+X:\DJ Music\playlists\BPM\129-132.m3u8
+X:\DJ Music\playlists\BPM\133-139.m3u8
+X:\DJ Music\playlists\BPM\140-159.m3u8
+X:\DJ Music\playlists\BPM\160-169.m3u8
+X:\DJ Music\playlists\BPM\170-179.m3u8
+X:\DJ Music\playlists\BPM\180-189.m3u8
+X:\DJ Music\playlists\BPM\190-199.m3u8
+X:\DJ Music\playlists\BPM\200-209.m3u8
+X:\DJ Music\playlists\BPM\210-219.m3u8
+X:\DJ Music\playlists\BPM\220plus.m3u8
+X:\DJ Music\playlists\BPM\UnknownBPM.m3u8
+```
+
+実際には `dj_music_organizer.config.json` の `bpm_ranges` を使うため、180以上のBPM帯も解析、配置、プレイリスト生成の対象になります。
+
+`.m3u8` 内のパスは、各プレイリストファイルから見た相対パスです。たとえば `playlists/BPM/125-128.m3u8` では以下のようになります。
+
+```text
+../../01_Analyzed/125-128/M2U - glory day_128BPM_8A.mp3
+```
+
+空のBPM帯も含めて構造を作るのが標準です。曲が入っているBPM帯だけ作りたい場合は `--only-non-empty` を使います。
+
+## Sourceプレイリスト生成
 
 `organizer_log.jsonl` から `source_hint` 別の `.m3u8` を生成します。
 

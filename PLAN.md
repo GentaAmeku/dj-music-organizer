@@ -52,19 +52,22 @@ Exit criteria:
 
 - UnknownKey tracks can be reviewed and upgraded without changing known-key tracks automatically.
 
-## Phase 3: Source Playlist Script
+## Phase 3: Playlist Scripts
 
 Tasks:
 
+- Generate BPM playlists from `01_Analyzed/{BPMRange}`.
+- Write BPM playlists to `playlists/BPM/{BPMRange}.m3u8`.
+- Keep BPM playlist names aligned with `dj_music_organizer.config.json` `bpm_ranges`.
 - Read `organizer_log.jsonl`.
 - Group successful analyzed tracks by `source_hint`.
 - Generate `playlists/{source_hint}.m3u8`.
-- Use relative paths from `playlists/` to `01_Analyzed`.
+- Use relative paths from each `.m3u8` file to `01_Analyzed`.
 - Skip missing output files unless `--include-missing` is explicitly added later.
 
 Exit criteria:
 
-- Copying `DJ Music/01_Analyzed` and `DJ Music/playlists` to USB preserves playlist path validity.
+- Copying `DJ Music/01_Analyzed` and `DJ Music/playlists` to USB preserves BPM and source playlist path validity.
 
 ## Phase 4: USB Export Script
 

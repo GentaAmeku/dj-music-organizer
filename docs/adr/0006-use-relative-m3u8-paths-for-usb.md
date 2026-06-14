@@ -22,17 +22,25 @@ Windows のUSBドライブレターは `E:\`、`F:\` など環境や接続タイ
 ../01_Analyzed/125-128/M2U - glory day_128BPM_8A.mp3
 ```
 
+`playlists/BPM/{BPMRange}.m3u8` には、`playlists/BPM/` から見た相対パスを書く。
+
+例:
+
+```text
+../../01_Analyzed/125-128/M2U - glory day_128BPM_8A.mp3
+```
+
 PC内ライブラリとUSB内ライブラリは同じ構成にする。
 
 ```text
 DJ Music/
   01_Analyzed/
   playlists/
+    BPM/
 ```
 
 ## Consequences
 
 USBのドライブレターが変わっても、フォルダ構造が保たれていればプレイリストが壊れにくい。
 
-一方で、rekordboxやDJアプリ側の相対パス解決に依存するため、実機での確認は必要になる。
-
+一方で、rekordbox側の相対パス解決に依存するため、実機での確認は必要になる。
