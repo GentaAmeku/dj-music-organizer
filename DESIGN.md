@@ -38,10 +38,18 @@ DJ Music/
     UnknownBPM/
   90_Archive/
   playlists/
-    BPM/
-      Under100.m3u8
-      100-109.m3u8
-      ...
+    Collections/
+      DJMAX/
+        DJMAX_All.m3u8
+        BPM/
+          Under100.m3u8
+          100-109.m3u8
+          ...
+    Global/
+      BPM/
+        Under100.m3u8
+        100-109.m3u8
+        ...
   reports/
 ```
 
@@ -51,7 +59,7 @@ Reports are indexed at:
 DJ Music/reports/INDEX.md
 ```
 
-`00_Inbox/{Source}/...` may be used by the user to provide a source hint such as `DJMAX` or `RagnarokOnline`. The source hint is logged and later used for playlist generation, but it is not placed in the analyzed file name.
+`00_Inbox/{Source}/...` may be used by the user to provide a source hint such as `DJMAX` or `RagnarokOnline`. The source hint is logged and later used as the collection id for playlist generation, but it is not placed in the analyzed file name.
 
 ## File Naming
 
@@ -177,39 +185,46 @@ Use two future Codex skills:
 
 ### BPM playlists
 
-rekordbox may not preserve the physical `01_Analyzed/{BPMRange}` folder hierarchy as a browsable playlist tree. To make BPM browsing explicit, generate one `.m3u8` per BPM folder:
+rekordbox may not preserve the physical `01_Analyzed/{BPMRange}` folder hierarchy as a browsable playlist tree. To make title and BPM browsing explicit, generate collection-scoped playlists from `source_hint`:
 
 ```text
-DJ Music/playlists/BPM/Under100.m3u8
-DJ Music/playlists/BPM/100-109.m3u8
-DJ Music/playlists/BPM/110-119.m3u8
-DJ Music/playlists/BPM/120-124.m3u8
-DJ Music/playlists/BPM/125-128.m3u8
-DJ Music/playlists/BPM/129-132.m3u8
-DJ Music/playlists/BPM/133-139.m3u8
-DJ Music/playlists/BPM/140-159.m3u8
-DJ Music/playlists/BPM/160-169.m3u8
-DJ Music/playlists/BPM/170-179.m3u8
-DJ Music/playlists/BPM/180-189.m3u8
-DJ Music/playlists/BPM/190-199.m3u8
-DJ Music/playlists/BPM/200-209.m3u8
-DJ Music/playlists/BPM/210-219.m3u8
-DJ Music/playlists/BPM/220plus.m3u8
-DJ Music/playlists/BPM/UnknownBPM.m3u8
+DJ Music/playlists/Collections/DJMAX/DJMAX_All.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/Under100.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/100-109.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/110-119.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/120-124.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/125-128.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/129-132.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/133-139.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/140-159.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/160-169.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/170-179.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/180-189.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/190-199.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/200-209.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/210-219.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/220plus.m3u8
+DJ Music/playlists/Collections/DJMAX/BPM/UnknownBPM.m3u8
 ```
 
 The actual list of BPM playlists comes from `dj_music_organizer.config.json` `bpm_ranges`, so BPM values at `180` and above are analyzed, placed, and exported without changing the script.
 
 BPM playlists can be generated from either the filesystem under `01_Analyzed` or from successful `organizer_log.jsonl` entries.
 
-The default filesystem mode mirrors the physical `01_Analyzed/{BPMRange}` folders.
+The collection mode uses successful log entries because source information is not present in the physical `01_Analyzed/{BPMRange}` folder path.
 
 The candidate mode uses `rounded_bpm` and `bpm_candidates` from the log. This is useful when the analyzer may have detected a half-time BPM such as `99` while also recording `198` as a plausible DJ tempo. In candidate mode, the same track may appear in multiple BPM playlists. Candidate mode does not rename or move audio files.
+
+Global BPM playlists may also be generated for all-library browsing:
+
+```text
+DJ Music/playlists/Global/BPM/125-128.m3u8
+```
 
 Entries are relative to each `.m3u8` file:
 
 ```text
-../../01_Analyzed/125-128/M2U - glory day_128BPM_8A.mp3
+../../../../01_Analyzed/125-128/M2U - glory day_128BPM_8A.mp3
 ```
 
 ### Source playlists
@@ -250,5 +265,6 @@ USB/
   DJ Music/
     01_Analyzed/
     playlists/
-      BPM/
+      Collections/
+      Global/
 ```

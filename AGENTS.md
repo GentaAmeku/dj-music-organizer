@@ -39,6 +39,7 @@
 - Key推定は特に揺れるため、`UnknownKey` や怪しい結果を無理に補正しない。
 - BPM帯の有無を判断するときは、物理フォルダだけでなく `organizer_log.jsonl` の `rounded_bpm` と `bpm_candidates` も確認する。
 - `bpm_candidates` はプレイリスト候補として扱い、正解データなしにリネームや物理移動へ使わない。
+- rekordbox向けBPMプレイリストは、タイトル混在を避けるため `playlists/Collections/{source_hint}/BPM/` を主系統にする。
 - 非ASCIIのメタデータがあり、ファイル名がASCII化済みの場合は、ファイル名側を優先した方が安全なことがある。
 
 ## Useful Commands

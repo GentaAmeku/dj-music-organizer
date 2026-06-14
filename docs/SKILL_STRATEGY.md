@@ -19,7 +19,7 @@ Responsibilities:
 - Use `wsl -e bash -lc '...'` for Bash pipelines and command substitution.
 - Run `--limit 10` dry-run before all-file analysis.
 - Audit `rounded_bpm` and `bpm_candidates` before deciding that a BPM range has no tracks.
-- Generate rekordbox BPM playlists with `--include-candidates` when half/double tempo candidates should be visible.
+- Generate rekordbox BPM playlists with `--scope collections --include-candidates` when title-separated half/double tempo candidates should be visible.
 - Keep reports under `reports/YYYY-MM-DD/` and update `reports/INDEX.md`.
 - Avoid touching `PIONEER`, system folders, and AppleDouble `._*` files.
 - Keep project changes in Git, excluding `.venv`, `__pycache__`, and runtime music-library outputs.
@@ -58,7 +58,8 @@ Use later if BPM playlist operations grow beyond the operational checklist.
 
 Responsibilities:
 
-- Generate or inspect `playlists/BPM/{BPMRange}.m3u8`.
+- Generate or inspect `playlists/Global/BPM/{BPMRange}.m3u8`.
+- Generate or inspect `playlists/Collections/{source_hint}/BPM/{BPMRange}.m3u8`.
 - Compare physical BPM folders with `rounded_bpm` and `bpm_candidates`.
 - Explain duplicate playlist membership caused by half/double tempo candidates.
 - Avoid renaming or moving files based only on candidates.

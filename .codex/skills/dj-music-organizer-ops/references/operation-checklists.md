@@ -132,11 +132,13 @@ print(len(rows))
 PY
 ```
 
-For rekordbox BPM playlists, use candidate mode unless the user asks for an exact mirror of physical folders:
+For rekordbox BPM playlists, use collection-scoped candidate mode unless the user asks for an exact mirror of physical folders:
 
 ```bash
-.venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --include-candidates --apply
+.venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --scope collections --include-candidates --apply
 ```
+
+Use `--scope both` when the user also wants all-library BPM playlists under `playlists/Global/BPM`.
 
 ## Git Hygiene
 

@@ -71,10 +71,10 @@ For rekordbox BPM playlist generation, prefer:
 
 ```bash
 cd /path/to/dj-music-organizer
-.venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --include-candidates --apply
+.venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --scope collections --include-candidates --apply
 ```
 
-Use physical folder mode only when the user explicitly wants playlists to mirror the current `01_Analyzed` folder placement exactly.
+Use `--scope both` when the user also wants all-library `playlists/Global/BPM` playlists. Use physical/global-only mode only when the user explicitly wants playlists to mirror the current `01_Analyzed` folder placement exactly.
 
 ## Repository Hygiene
 
