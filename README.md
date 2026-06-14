@@ -119,7 +119,7 @@ cd /path/to/dj-music-organizer
 rekordboxでBPM帯の構造をプレイリストとして読み込むため、`01_Analyzed` のBPMフォルダから `.m3u8` を生成します。
 
 ```bash
-.venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --apply
+.venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --include-candidates --apply
 ```
 
 プレイリストは以下に作られます。
@@ -144,6 +144,8 @@ X:\DJ Music\playlists\BPM\UnknownBPM.m3u8
 ```
 
 実際には `dj_music_organizer.config.json` の `bpm_ranges` を使うため、180以上のBPM帯も解析、配置、プレイリスト生成の対象になります。
+
+`--include-candidates` を付けると、解析時に保存した `bpm_candidates` もプレイリストに含めます。たとえば `99 / 198` の候補を持つ曲は、`Under100.m3u8` と `190-199.m3u8` の両方に入ります。ファイル本体のリネームや移動は行いません。
 
 `.m3u8` 内のパスは、各プレイリストファイルから見た相対パスです。たとえば `playlists/BPM/125-128.m3u8` では以下のようになります。
 

@@ -200,7 +200,11 @@ DJ Music/playlists/BPM/UnknownBPM.m3u8
 
 The actual list of BPM playlists comes from `dj_music_organizer.config.json` `bpm_ranges`, so BPM values at `180` and above are analyzed, placed, and exported without changing the script.
 
-BPM playlists are generated from the filesystem under `01_Analyzed`, not from `organizer_log.jsonl`. The BPM folder is the source of truth for this view.
+BPM playlists can be generated from either the filesystem under `01_Analyzed` or from successful `organizer_log.jsonl` entries.
+
+The default filesystem mode mirrors the physical `01_Analyzed/{BPMRange}` folders.
+
+The candidate mode uses `rounded_bpm` and `bpm_candidates` from the log. This is useful when the analyzer may have detected a half-time BPM such as `99` while also recording `198` as a plausible DJ tempo. In candidate mode, the same track may appear in multiple BPM playlists. Candidate mode does not rename or move audio files.
 
 Entries are relative to each `.m3u8` file:
 
