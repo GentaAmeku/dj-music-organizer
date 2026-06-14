@@ -37,6 +37,8 @@
 - 解析環境はプロジェクト内 `.venv` を使う。
 - BPM/Keyは推定値であり、正解として扱わない。
 - Key推定は特に揺れるため、`UnknownKey` や怪しい結果を無理に補正しない。
+- BPM帯の有無を判断するときは、物理フォルダだけでなく `organizer_log.jsonl` の `rounded_bpm` と `bpm_candidates` も確認する。
+- `bpm_candidates` はプレイリスト候補として扱い、正解データなしにリネームや物理移動へ使わない。
 - 非ASCIIのメタデータがあり、ファイル名がASCII化済みの場合は、ファイル名側を優先した方が安全なことがある。
 
 ## Useful Commands

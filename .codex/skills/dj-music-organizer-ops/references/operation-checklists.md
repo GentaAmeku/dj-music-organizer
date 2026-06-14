@@ -100,6 +100,44 @@ Some tracks have useful ASCII filenames but non-ASCII metadata titles.
 
 For this project, when ASCII filenames already exist and metadata contains non-ASCII title values, prefer the file name for generated DJ filenames. This avoids names collapsing to generic placeholders after ASCII sanitization.
 
+## BPM Playlist Lessons
+
+When checking whether BPM 180+ or any other range is represented correctly:
+
+1. Count files in physical folders under `01_Analyzed`.
+2. Search analyzed filenames for explicit `_180BPM_` or similar suffixes.
+3. Inspect successful `organizer_log.jsonl` entries for both `rounded_bpm` and `bpm_candidates`.
+4. Treat `bpm_candidates` as playlist candidates, not automatic permission to rename or move files.
+
+Useful audit pattern:
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+log = Path("/path/to/DJ Music/organizer_log.jsonl")
+rows = []
+for line in log.open(encoding="utf-8"):
+    if not line.strip():
+        continue
+    entry = json.loads(line)
+    if entry.get("status") not in {"applied", "copied_archived"}:
+        continue
+    candidates = entry.get("bpm_candidates") or []
+    if any(isinstance(value, int) and value >= 180 for value in candidates):
+        rows.append(entry)
+
+print(len(rows))
+PY
+```
+
+For rekordbox BPM playlists, use candidate mode unless the user asks for an exact mirror of physical folders:
+
+```bash
+.venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --include-candidates --apply
+```
+
 ## Git Hygiene
 
 Expected ignored entries:

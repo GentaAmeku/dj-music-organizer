@@ -61,6 +61,21 @@ Prefer JSON for machine-readable reports and Markdown for human review. After re
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\tools\index_reports.ps1" -LibraryRoot "X:\DJ Music"
 ```
 
+## BPM Playlist Checks
+
+Before concluding that a BPM range is empty or misplaced, inspect both physical folders and logged tempo candidates.
+
+Do not rely only on `01_Analyzed/{BPMRange}` counts. The analyzer can store half/double tempo options in `bpm_candidates`; for playlist work, these candidates may place one track in multiple BPM playlists without renaming or moving the audio file.
+
+For rekordbox BPM playlist generation, prefer:
+
+```bash
+cd /path/to/dj-music-organizer
+.venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --include-candidates --apply
+```
+
+Use physical folder mode only when the user explicitly wants playlists to mirror the current `01_Analyzed` folder placement exactly.
+
 ## Repository Hygiene
 
 Keep `.venv`, `__pycache__`, real audio libraries, runtime logs, and generated library folders out of Git.
