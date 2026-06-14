@@ -1,0 +1,4 @@
+interface:
+  display_name: "DJ Music Organizer Ops"
+  short_description: "Safely operate the DJ organizer workflow"
+  default_prompt: "Use $dj-music-organizer-ops to safely run the DJ Music Organizer workflow."

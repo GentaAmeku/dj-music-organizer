@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local virtual environment
+.venv/
+
+# Local test and temporary outputs
+tmp/
+*.tmp
+
+# DJ library runtime outputs, if a library is ever placed inside this repo
+DJ Music/
+organizer_log.jsonl
+reports/
+00_Inbox/
+01_Analyzed/
+90_Archive/
+playlists/
+

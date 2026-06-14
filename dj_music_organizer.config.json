@@ -1,0 +1,27 @@
+{
+  "analyzed_dir": "01_Analyzed",
+  "archive_dir": "90_Archive",
+  "inbox_dir": "00_Inbox",
+  "playlist_dir": "playlists",
+  "log_file": "organizer_log.jsonl",
+  "ascii_filenames": true,
+  "max_filename_length": 180,
+  "audio_extensions": [".wav", ".aiff", ".aif", ".mp3", ".m4a", ".flac"],
+  "bpm_ranges": [
+    {"name": "Under100", "min": null, "max": 99},
+    {"name": "100-109", "min": 100, "max": 109},
+    {"name": "110-119", "min": 110, "max": 119},
+    {"name": "120-124", "min": 120, "max": 124},
+    {"name": "125-128", "min": 125, "max": 128},
+    {"name": "129-132", "min": 129, "max": 132},
+    {"name": "133-139", "min": 133, "max": 139},
+    {"name": "140-159", "min": 140, "max": 159},
+    {"name": "160-169", "min": 160, "max": 169},
+    {"name": "170-179", "min": 170, "max": 179},
+    {"name": "180-189", "min": 180, "max": 189},
+    {"name": "190-199", "min": 190, "max": 199},
+    {"name": "200-209", "min": 200, "max": 209},
+    {"name": "210-219", "min": 210, "max": 219},
+    {"name": "220plus", "min": 220, "max": null}
+  ]
+}
