@@ -194,17 +194,7 @@ CSVよりJSONとMarkdownを優先します。
 - [PLAN.md](PLAN.md): フェーズ計画
 - [docs/adr/](docs/adr/): Architecture Decision Records
 - [docs/SKILL_STRATEGY.md](docs/SKILL_STRATEGY.md): Codexスキル化方針
-- [skills/dj-music-organizer-ops/](skills/dj-music-organizer-ops/): このプロジェクト用の運用スキル
-
-## Codexスキル
-
-このリポジトリの `skills/dj-music-organizer-ops/` はスキルの正本です。
-
-Codexで実際に使う場合は、以下のようにユーザーのCodexスキルディレクトリへコピーします。
-
-```powershell
-Copy-Item -Recurse -Force .\skills\dj-music-organizer-ops "$env:USERPROFILE\.codex\skills\dj-music-organizer-ops"
-```
+- [.codex/skills/dj-music-organizer-ops/](.codex/skills/dj-music-organizer-ops/): このプロジェクト用の運用スキル
 
 ## 現在の制約
 

@@ -25,18 +25,10 @@ Responsibilities:
 Suggested location:
 
 ```text
-/path/to/dj-music-organizer/skills/dj-music-organizer-ops
+/path/to/dj-music-organizer/.codex/skills/dj-music-organizer-ops
 ```
 
-This keeps the skill versioned with the project.
-
-For day-to-day Codex use, install a copy into the user skill directory:
-
-```text
-~/.codex/skills/dj-music-organizer-ops
-```
-
-Keep the repository copy as the source of truth and refresh the installed copy after editing the skill.
+This keeps the skill versioned with the project and makes the Codex-specific purpose explicit. If a Codex surface does not auto-discover repository-local skills, install or copy this directory into the user skill directory as a fallback.
 
 ### `dj-transition-suggest`
 
