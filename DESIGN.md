@@ -100,11 +100,23 @@ The first implementation may depend on external Python/audio libraries. BPM and 
 Rules:
 
 - Round BPM to the nearest integer for file names and folder placement.
-- Store the raw floating BPM in the log.
-- Do not auto-correct half/double tempo.
+- Store the selected floating BPM, rounded BPM, candidate BPMs, analysis policy, source, alternatives, and confidence in the log.
+- Keep the default BPM policy as `raw`; do not silently force half/double correction.
+- Allow an explicit `prefer-dj-range` policy for previewing DJ-friendly half/double choices.
+- Allow rekordbox-derived BPM overrides through `bpm_overrides.json`.
 - Show candidate tempos such as `87 / 174` in dry-run output.
 - Do not force Camelot conversion when major/minor is unknown.
 - Continue processing other files when one file fails.
+
+### BPM correction workflow
+
+The audio analyzer is a helper, not the source of truth.
+
+If rekordbox reports a meaningfully different BPM, import that value into `bpm_overrides.json`.
+Future organizer runs use matching overrides before the analyzer result for file naming and BPM folder placement.
+
+Existing files under `01_Analyzed` may be corrected by moving and renaming them from `bpm_overrides.json`.
+Such corrections append `bpm_corrected` log entries so playlist generation can follow the new destination path.
 
 ## Apply Behavior
 
@@ -150,6 +162,10 @@ file_sha256
 estimated_bpm
 rounded_bpm
 bpm_candidates
+bpm_source
+bpm_policy
+bpm_alternatives
+bpm_confidence
 estimated_key_raw
 estimated_key
 camelot

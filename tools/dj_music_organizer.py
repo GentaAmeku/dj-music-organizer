@@ -73,12 +73,28 @@ class PlanItem:
     estimated_bpm: float | None
     rounded_bpm: int | None
     bpm_candidates: list[int]
+    bpm_source: str
+    bpm_policy: str
+    bpm_alternatives: list[dict[str, Any]]
+    bpm_confidence: str | None
     estimated_key_raw: str | None
     estimated_key: str | None
     camelot: str
     status: str
     error: str | None = None
     skipped_reason: str | None = None
+
+
+@dataclass
+class BpmEstimate:
+    bpm: float | None
+    rounded_bpm: int | None
+    candidates: list[int]
+    source: str
+    policy: str
+    alternatives: list[dict[str, Any]]
+    confidence: str | None
+    warning: str | None = None
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -106,6 +122,65 @@ def load_config(root: Path, config_name: str) -> dict[str, Any]:
     if not path.exists():
         raise SystemExit(f"Config file not found: {path}")
     return load_json(path)
+
+
+def load_bpm_overrides(root: Path, config: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    override_name = config.get("bpm_overrides_file")
+    if not override_name:
+        return {"hash": [], "filename": [], "path": []}
+
+    path = root / str(override_name)
+    if not path.exists():
+        return {"hash": [], "filename": [], "path": []}
+
+    data = load_json(path)
+    if isinstance(data, dict):
+        raw_items = data.get("items", [])
+    elif isinstance(data, list):
+        raw_items = data
+    else:
+        raw_items = []
+    indexes: dict[str, list[dict[str, Any]]] = {"hash": [], "filename": [], "path": []}
+    for raw_item in raw_items:
+        if not isinstance(raw_item, dict):
+            continue
+        try:
+            bpm = float(raw_item["bpm"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        item = dict(raw_item)
+        item["bpm"] = bpm
+        if item.get("file_sha256"):
+            indexes["hash"].append(item)
+        if item.get("filename"):
+            indexes["filename"].append(item)
+        if item.get("path"):
+            indexes["path"].append(item)
+    return indexes
+
+
+def normalize_lookup_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip()).casefold()
+
+
+def lookup_bpm_override(
+    overrides: dict[str, list[dict[str, Any]]],
+    source_path: Path,
+    file_hash: str,
+) -> dict[str, Any] | None:
+    normalized_name = normalize_lookup_text(source_path.name)
+    normalized_path = normalize_lookup_text(str(source_path))
+
+    for item in overrides["hash"]:
+        if normalize_lookup_text(str(item.get("file_sha256"))) == file_hash.casefold():
+            return item
+    for item in overrides["path"]:
+        if normalize_lookup_text(str(item.get("path"))) == normalized_path:
+            return item
+    for item in overrides["filename"]:
+        if normalize_lookup_text(str(item.get("filename"))) == normalized_name:
+            return item
+    return None
 
 
 def iter_audio_files(input_path: Path, extensions: set[str]) -> list[Path]:
@@ -137,7 +212,7 @@ def read_successful_log_keys(log_path: Path) -> tuple[set[str], set[str]]:
                 entry = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if entry.get("status") in {"applied", "copied_archived"}:
+            if entry.get("status") in {"applied", "copied_archived", "bpm_corrected"}:
                 if entry.get("file_sha256"):
                     hashes.add(entry["file_sha256"])
                 if entry.get("source_path"):
@@ -299,27 +374,171 @@ def bpm_candidates(rounded_bpm: int | None) -> list[int]:
     return sorted(candidates)
 
 
-def estimate_audio(path: Path) -> tuple[float | None, str | None, str | None, str | None]:
+def tempo_in_bounds(value: int, config: dict[str, Any]) -> bool:
+    bpm_config = config.get("bpm_analysis", {})
+    lo = int(bpm_config.get("min_tempo", 60))
+    hi = int(bpm_config.get("max_tempo", 260))
+    return lo <= value <= hi
+
+
+def normalized_bpm_candidates(
+    rounded_values: Iterable[int | None],
+    config: dict[str, Any],
+) -> list[int]:
+    candidates: set[int] = set()
+    for rounded in rounded_values:
+        if rounded is None:
+            continue
+        for value in bpm_candidates(rounded):
+            if tempo_in_bounds(value, config):
+                candidates.add(value)
+    return sorted(candidates)
+
+
+def estimate_bpm_from_signal(y: Any, sr: int, config: dict[str, Any]) -> BpmEstimate:
+    import librosa
+    import numpy as np
+
+    bpm_config = config.get("bpm_analysis", {})
+    policy = str(bpm_config.get("policy", "raw"))
+    preferred_min = int(bpm_config.get("preferred_min", 120))
+    preferred_max = int(bpm_config.get("preferred_max", 220))
+
+    onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+    estimates: list[dict[str, Any]] = []
+
+    def add_estimate(method: str, value: float | None) -> None:
+        if value is None or not np.isfinite(value) or value <= 0:
+            return
+        rounded = int(round(float(value)))
+        if tempo_in_bounds(rounded, config):
+            estimates.append(
+                {
+                    "method": method,
+                    "bpm": float(value),
+                    "rounded_bpm": rounded,
+                }
+            )
+
+    try:
+        primary = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=np.median)
+        add_estimate("onset_median", float(primary[0]) if len(primary) else None)
+    except Exception:
+        pass
+
+    try:
+        mean_tempo = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=np.mean)
+        add_estimate("onset_mean", float(mean_tempo[0]) if len(mean_tempo) else None)
+    except Exception:
+        pass
+
+    try:
+        frame_tempos = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=None)
+        if len(frame_tempos):
+            add_estimate("frame_median", float(np.median(frame_tempos)))
+            add_estimate("frame_mode", float(np.bincount(np.rint(frame_tempos).astype(int)).argmax()))
+    except Exception:
+        pass
+
+    if not estimates:
+        return BpmEstimate(None, None, [], "analysis", policy, [], None, "BPM could not be estimated")
+
+    primary = estimates[0]
+    candidate_values = normalized_bpm_candidates(
+        (item["rounded_bpm"] for item in estimates),
+        config,
+    )
+
+    selected = int(primary["rounded_bpm"])
+    if policy == "prefer-dj-range":
+        scores: dict[int, float] = {}
+        for item in estimates:
+            rounded = int(item["rounded_bpm"])
+            scores[rounded] = scores.get(rounded, 0.0) + 1.0
+            for candidate in bpm_candidates(rounded):
+                if candidate != rounded and tempo_in_bounds(candidate, config):
+                    scores[candidate] = scores.get(candidate, 0.0) + 0.85
+        for candidate in list(scores):
+            if preferred_min <= candidate <= preferred_max:
+                scores[candidate] += 0.4
+        selected = sorted(
+            scores,
+            key=lambda value: (
+                -scores[value],
+                abs(value - int(primary["rounded_bpm"])),
+                value,
+            ),
+        )[0]
+
+    if selected not in candidate_values:
+        candidate_values.append(selected)
+        candidate_values.sort()
+
+    support = sum(1 for item in estimates if int(item["rounded_bpm"]) == selected)
+    scaled_support = sum(
+        1
+        for item in estimates
+        if selected in bpm_candidates(int(item["rounded_bpm"]))
+        and int(item["rounded_bpm"]) != selected
+    )
+    if support >= 2:
+        confidence = "high"
+    elif support == 1 or scaled_support >= 2:
+        confidence = "medium"
+    else:
+        confidence = "low"
+
+    selected_float = float(selected)
+    return BpmEstimate(
+        bpm=selected_float,
+        rounded_bpm=selected,
+        candidates=candidate_values,
+        source="analysis",
+        policy=policy,
+        alternatives=estimates,
+        confidence=confidence,
+    )
+
+
+def bpm_estimate_from_override(item: dict[str, Any], config: dict[str, Any]) -> BpmEstimate:
+    rounded = int(round(float(item["bpm"])))
+    candidates = normalized_bpm_candidates([rounded], config)
+    if rounded not in candidates:
+        candidates.append(rounded)
+        candidates.sort()
+    return BpmEstimate(
+        bpm=float(item["bpm"]),
+        rounded_bpm=rounded,
+        candidates=candidates,
+        source=str(item.get("source") or "override"),
+        policy="override",
+        alternatives=[],
+        confidence="manual",
+    )
+
+
+def estimate_audio(path: Path, config: dict[str, Any]) -> tuple[BpmEstimate, str | None, str | None, str | None, str | None]:
     try:
         import librosa
         import numpy as np
     except Exception as exc:
-        return None, None, None, None, f"analysis dependencies unavailable: {exc}"
+        empty = BpmEstimate(None, None, [], "analysis", "raw", [], None)
+        return empty, None, None, None, f"analysis dependencies unavailable: {exc}"
 
     try:
         y, sr = librosa.load(str(path), sr=None, mono=True)
         if len(y) == 0:
-            return None, None, None, None, "empty audio"
+            empty = BpmEstimate(None, None, [], "analysis", "raw", [], None)
+            return empty, None, None, None, "empty audio"
 
-        tempo_result = librosa.feature.tempo(y=y, sr=sr, aggregate=None)
-        bpm = float(np.median(tempo_result)) if len(tempo_result) else None
-
+        bpm_estimate = estimate_bpm_from_signal(y, sr, config)
         chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
         chroma_mean = np.mean(chroma, axis=1)
         key_raw, key_name, camelot = estimate_key_from_chroma(chroma_mean)
-        return bpm, key_raw, key_name, camelot, None
+        return bpm_estimate, key_raw, key_name, camelot, bpm_estimate.warning
     except Exception as exc:
-        return None, None, None, None, str(exc)
+        empty = BpmEstimate(None, None, [], "analysis", "raw", [], None)
+        return empty, None, None, None, str(exc)
 
 
 def estimate_key_from_chroma(chroma_mean: Any) -> tuple[str | None, str | None, str]:
@@ -358,6 +577,7 @@ def make_plan_item(
     root: Path,
     input_path: Path,
     config: dict[str, Any],
+    bpm_overrides: dict[str, list[dict[str, Any]]],
     seen_hashes: set[str],
     seen_paths: set[str],
     force: bool,
@@ -395,6 +615,10 @@ def make_plan_item(
             estimated_bpm=None,
             rounded_bpm=None,
             bpm_candidates=[],
+            bpm_source="none",
+            bpm_policy=str(config.get("bpm_analysis", {}).get("policy", "raw")),
+            bpm_alternatives=[],
+            bpm_confidence=None,
             estimated_key_raw=None,
             estimated_key=None,
             camelot="UnknownKey",
@@ -402,8 +626,12 @@ def make_plan_item(
             skipped_reason="already processed",
         )
 
-    estimated_bpm, key_raw, key_name, camelot_from_analysis, error = estimate_audio(source_path)
-    rounded = round(estimated_bpm) if estimated_bpm is not None else None
+    bpm_estimate, key_raw, key_name, camelot_from_analysis, error = estimate_audio(source_path, config)
+    override_item = lookup_bpm_override(bpm_overrides, source_path, file_hash)
+    if override_item:
+        bpm_estimate = bpm_estimate_from_override(override_item, config)
+    estimated_bpm = bpm_estimate.bpm
+    rounded = bpm_estimate.rounded_bpm
     camelot = camelot_from_analysis or "UnknownKey"
     if key_name is None:
         camelot = "UnknownKey"
@@ -438,7 +666,11 @@ def make_plan_item(
         file_sha256=file_hash,
         estimated_bpm=estimated_bpm,
         rounded_bpm=rounded,
-        bpm_candidates=bpm_candidates(rounded),
+        bpm_candidates=bpm_estimate.candidates,
+        bpm_source=bpm_estimate.source,
+        bpm_policy=bpm_estimate.policy,
+        bpm_alternatives=bpm_estimate.alternatives,
+        bpm_confidence=bpm_estimate.confidence,
         estimated_key_raw=key_raw,
         estimated_key=key_name,
         camelot=camelot,
@@ -460,6 +692,10 @@ def item_to_log(item: PlanItem, status: str, error: str | None = None) -> dict[s
         "estimated_bpm": item.estimated_bpm,
         "rounded_bpm": item.rounded_bpm,
         "bpm_candidates": item.bpm_candidates,
+        "bpm_source": item.bpm_source,
+        "bpm_policy": item.bpm_policy,
+        "bpm_alternatives": item.bpm_alternatives,
+        "bpm_confidence": item.bpm_confidence,
         "estimated_key_raw": item.estimated_key_raw,
         "estimated_key": item.estimated_key,
         "camelot": item.camelot,
@@ -483,6 +719,7 @@ def print_item(item: PlanItem) -> None:
     print(f"  archive -> {item.archive_path}")
     print(f"  bpm: {item.estimated_bpm if item.estimated_bpm is not None else 'Unknown'} -> {item.rounded_bpm if item.rounded_bpm is not None else 'Unknown'}")
     print(f"  bpm candidates: {', '.join(map(str, item.bpm_candidates)) if item.bpm_candidates else 'Unknown'}")
+    print(f"  bpm source: {item.bpm_source} / {item.bpm_policy} / confidence={item.bpm_confidence or 'Unknown'}")
     print(f"  key: {item.estimated_key_raw or 'Unknown'} -> {item.camelot}")
     print(f"  source_hint: {item.source_hint or 'None'}")
     if item.error:
@@ -589,11 +826,19 @@ def main() -> int:
     parser.add_argument("--yes", action="store_true", help="Skip apply confirmation")
     parser.add_argument("--force", action="store_true", help="Reprocess files seen in previous successful logs")
     parser.add_argument("--limit", type=int, help="Analyze at most this many files")
+    parser.add_argument(
+        "--bpm-policy",
+        choices=["raw", "prefer-dj-range"],
+        help="Override bpm_analysis.policy for this run",
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input).expanduser().resolve()
     root = find_library_root(input_path, args.config, args.library_root)
     config = load_config(root, args.config)
+    if args.bpm_policy:
+        config.setdefault("bpm_analysis", {})["policy"] = args.bpm_policy
+    bpm_overrides = load_bpm_overrides(root, config)
     log_path = root / config["log_file"]
     extensions = {ext.lower() for ext in config["audio_extensions"]}
     files = iter_audio_files(input_path, extensions)
@@ -613,6 +858,7 @@ def main() -> int:
             root,
             input_path,
             config,
+            bpm_overrides,
             seen_hashes,
             seen_paths,
             args.force,

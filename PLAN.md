@@ -43,6 +43,9 @@ Exit criteria:
 Tasks:
 
 - Improve BPM estimation quality.
+- Record BPM analysis policy, candidates, alternatives, source, and confidence in logs.
+- Import rekordbox XML/CSV BPM values into `bpm_overrides.json`.
+- Apply BPM overrides to existing `01_Analyzed` files with dry-run first.
 - Improve key estimation quality on WSL Ubuntu.
 - Add clear warnings for low-confidence or incomplete key results.
 - Add `--reanalyze-unknown-key` dry-run behavior.

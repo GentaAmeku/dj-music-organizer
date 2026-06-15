@@ -4,9 +4,17 @@
   "inbox_dir": "00_Inbox",
   "playlist_dir": "playlists",
   "log_file": "organizer_log.jsonl",
+  "bpm_overrides_file": "bpm_overrides.json",
   "ascii_filenames": true,
   "max_filename_length": 180,
   "audio_extensions": [".wav", ".aiff", ".aif", ".mp3", ".m4a", ".flac"],
+  "bpm_analysis": {
+    "policy": "raw",
+    "preferred_min": 120,
+    "preferred_max": 220,
+    "min_tempo": 60,
+    "max_tempo": 260
+  },
   "bpm_ranges": [
     {"name": "Under100", "min": null, "max": 99},
     {"name": "100-109", "min": 100, "max": 109},

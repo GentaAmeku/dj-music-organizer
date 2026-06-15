@@ -67,6 +67,22 @@ Before concluding that a BPM range is empty or misplaced, inspect both physical 
 
 Do not rely only on `01_Analyzed/{BPMRange}` counts. The analyzer can store half/double tempo options in `bpm_candidates`; for playlist work, these candidates may place one track in multiple BPM playlists without renaming or moving the audio file.
 
+If the user reports that rekordbox BPM differs from organizer BPM, do not fix it by blindly doubling or halving every affected range. Treat rekordbox as calibration data:
+
+1. Import rekordbox XML/CSV into `bpm_overrides.json`.
+2. Preview `tools/dj_apply_bpm_overrides.py`.
+3. Apply only after the preview makes sense.
+4. Regenerate collection BPM playlists.
+
+Useful commands:
+
+```bash
+cd /path/to/dj-music-organizer
+.venv/bin/python tools/dj_import_rekordbox_bpm.py --rekordbox-export "/path/to/rekordbox.xml" --library-root "/path/to/DJ Music" --apply
+.venv/bin/python tools/dj_apply_bpm_overrides.py --library-root "/path/to/DJ Music"
+.venv/bin/python tools/dj_apply_bpm_overrides.py --library-root "/path/to/DJ Music" --apply
+```
+
 For rekordbox BPM playlist generation, prefer:
 
 ```bash

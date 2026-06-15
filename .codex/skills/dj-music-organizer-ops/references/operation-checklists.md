@@ -140,6 +140,28 @@ For rekordbox BPM playlists, use collection-scoped candidate mode unless the use
 
 Use `--scope both` when the user also wants all-library BPM playlists under `playlists/Global/BPM`.
 
+## Rekordbox BPM Correction Lessons
+
+When rekordbox finds many BPM values that differ from organizer output:
+
+1. Do not mass double/halve filenames or folders.
+2. Export rekordbox XML or CSV.
+3. Import BPM values into `bpm_overrides.json`.
+4. Preview corrections against `01_Analyzed`.
+5. Apply corrections only after the preview is plausible.
+6. Regenerate BPM playlists.
+
+Commands:
+
+```bash
+.venv/bin/python tools/dj_import_rekordbox_bpm.py --rekordbox-export "/path/to/rekordbox.xml" --library-root "/path/to/DJ Music" --apply
+.venv/bin/python tools/dj_apply_bpm_overrides.py --library-root "/path/to/DJ Music"
+.venv/bin/python tools/dj_apply_bpm_overrides.py --library-root "/path/to/DJ Music" --apply
+.venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --scope collections --include-candidates --apply
+```
+
+After applying corrections, playlist generation must treat `bpm_corrected` log entries as successful current destinations.
+
 ## Git Hygiene
 
 Expected ignored entries:

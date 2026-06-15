@@ -58,7 +58,7 @@ def read_successful_entries(log_path: Path) -> list[dict[str, Any]]:
                 entry = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if entry.get("status") in {"applied", "copied_archived"} and entry.get("dest_path"):
+            if entry.get("status") in {"applied", "copied_archived", "bpm_corrected"} and entry.get("dest_path"):
                 entries.append(entry)
     return entries
 
