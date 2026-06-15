@@ -140,27 +140,26 @@ For rekordbox BPM playlists, use collection-scoped candidate mode unless the use
 
 Use `--scope both` when the user also wants all-library BPM playlists under `playlists/Global/BPM`.
 
-## Rekordbox BPM Correction Lessons
+## BPM Accuracy Lessons
 
 When rekordbox finds many BPM values that differ from organizer output:
 
 1. Do not mass double/halve filenames or folders.
-2. Export rekordbox XML or CSV.
-3. Import BPM values into `bpm_overrides.json`.
-4. Preview corrections against `01_Analyzed`.
-5. Apply corrections only after the preview is plausible.
-6. Regenerate BPM playlists.
+2. Do not immediately treat rekordbox as the source of truth.
+3. Re-run a small preview with `--bpm-policy consensus`.
+4. Inspect `bpm_candidates`, `bpm_alternatives`, and `bpm_confidence`.
+5. Check whether the issue is half-time/double-time ambiguity, weak percussion, intro/outro tempo, or noisy candidates.
+6. Improve internal analysis before using external overrides.
 
 Commands:
 
 ```bash
-.venv/bin/python tools/dj_import_rekordbox_bpm.py --rekordbox-export "/path/to/rekordbox.xml" --library-root "/path/to/DJ Music" --apply
-.venv/bin/python tools/dj_apply_bpm_overrides.py --library-root "/path/to/DJ Music"
-.venv/bin/python tools/dj_apply_bpm_overrides.py --library-root "/path/to/DJ Music" --apply
+.venv/bin/python tools/dj_music_organizer.py --input "/path/to/DJ Music/00_Inbox" --limit 10 --bpm-policy consensus
+.venv/bin/python tools/dj_music_organizer.py --input "/path/to/file.mp3" --library-root "/path/to/DJ Music" --force --bpm-policy consensus
 .venv/bin/python tools/dj_playlist_by_bpm.py --library-root "/path/to/DJ Music" --scope collections --include-candidates --apply
 ```
 
-After applying corrections, playlist generation must treat `bpm_corrected` log entries as successful current destinations.
+Use rekordbox XML/CSV import and `bpm_overrides.json` only when the user explicitly asks for manual correction or comparison. Normal organizer runs ignore overrides unless `--use-bpm-overrides` is passed.
 
 ## Git Hygiene
 

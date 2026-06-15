@@ -67,20 +67,19 @@ Before concluding that a BPM range is empty or misplaced, inspect both physical 
 
 Do not rely only on `01_Analyzed/{BPMRange}` counts. The analyzer can store half/double tempo options in `bpm_candidates`; for playlist work, these candidates may place one track in multiple BPM playlists without renaming or moving the audio file.
 
-If the user reports that rekordbox BPM differs from organizer BPM, do not fix it by blindly doubling or halving every affected range. Treat rekordbox as calibration data:
+If the user reports that rekordbox BPM differs from organizer BPM, do not fix it by blindly doubling or halving every affected range. First inspect the organizer's own BPM evidence:
 
-1. Import rekordbox XML/CSV into `bpm_overrides.json`.
-2. Preview `tools/dj_apply_bpm_overrides.py`.
-3. Apply only after the preview makes sense.
-4. Regenerate collection BPM playlists.
+1. Re-run a small preview with `--bpm-policy consensus`.
+2. Inspect `bpm_candidates`, `bpm_alternatives`, and `bpm_confidence`.
+3. Improve the internal analysis logic if the evidence points to a systematic issue.
+4. Use rekordbox import or `bpm_overrides.json` only when the user explicitly wants manual correction/comparison.
 
 Useful commands:
 
 ```bash
 cd /path/to/dj-music-organizer
-.venv/bin/python tools/dj_import_rekordbox_bpm.py --rekordbox-export "/path/to/rekordbox.xml" --library-root "/path/to/DJ Music" --apply
-.venv/bin/python tools/dj_apply_bpm_overrides.py --library-root "/path/to/DJ Music"
-.venv/bin/python tools/dj_apply_bpm_overrides.py --library-root "/path/to/DJ Music" --apply
+.venv/bin/python tools/dj_music_organizer.py --input "/path/to/DJ Music/00_Inbox" --limit 10 --bpm-policy consensus
+.venv/bin/python tools/dj_music_organizer.py --input "/path/to/file.mp3" --library-root "/path/to/DJ Music" --force --bpm-policy consensus
 ```
 
 For rekordbox BPM playlist generation, prefer:

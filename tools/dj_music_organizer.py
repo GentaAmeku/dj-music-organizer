@@ -395,19 +395,218 @@ def normalized_bpm_candidates(
     return sorted(candidates)
 
 
+def tempo_candidates_for_vote(rounded: int, config: dict[str, Any], include_scaled: bool) -> list[tuple[int, float]]:
+    candidates = [(rounded, 1.0)]
+    if include_scaled:
+        for candidate in bpm_candidates(rounded):
+            if candidate != rounded and tempo_in_bounds(candidate, config):
+                candidates.append((candidate, 0.65))
+    return candidates
+
+
+def tempo_cluster_key(value: int, existing: list[int], tolerance: int = 2) -> int:
+    for key in existing:
+        if abs(value - key) <= tolerance:
+            return key
+    return value
+
+
+def score_tempo_estimates(
+    estimates: list[dict[str, Any]],
+    config: dict[str, Any],
+    policy: str,
+) -> tuple[int | None, dict[int, float]]:
+    bpm_config = config.get("bpm_analysis", {})
+    preferred_min = int(bpm_config.get("preferred_min", 120))
+    preferred_max = int(bpm_config.get("preferred_max", 220))
+    include_scaled = policy in {"consensus", "prefer-dj-range"}
+    use_preferred_bias = policy == "prefer-dj-range"
+
+    scores: dict[int, float] = {}
+    cluster_keys: list[int] = []
+    for item in estimates:
+        rounded = int(item["rounded_bpm"])
+        base_weight = float(item.get("weight", 1.0))
+        for candidate, multiplier in tempo_candidates_for_vote(rounded, config, include_scaled):
+            if not tempo_in_bounds(candidate, config):
+                continue
+            key = tempo_cluster_key(candidate, cluster_keys)
+            if key == candidate:
+                cluster_keys.append(key)
+            scores[key] = scores.get(key, 0.0) + base_weight * multiplier
+
+    if not scores:
+        return None, {}
+
+    if use_preferred_bias:
+        for candidate in list(scores):
+            if preferred_min <= candidate <= preferred_max:
+                scores[candidate] += 0.4
+
+    primary = int(estimates[0]["rounded_bpm"])
+    selected = sorted(
+        scores,
+        key=lambda value: (
+            -scores[value],
+            abs(value - primary),
+            value,
+        ),
+    )[0]
+    return selected, scores
+
+
+def nearest_scored_tempo(scores: dict[int, float], target: int, tolerance: int = 2) -> int | None:
+    matches = [tempo for tempo in scores if abs(tempo - target) <= tolerance]
+    if not matches:
+        return None
+    return sorted(matches, key=lambda tempo: (abs(tempo - target), -scores[tempo]))[0]
+
+
+def has_direct_tempo_support(estimates: list[dict[str, Any]], target: int, tolerance: int = 2) -> bool:
+    direct_methods = ("onset_interval", "tempogram_peak_1")
+    return any(
+        str(item.get("method", "")).startswith(direct_methods)
+        and abs(int(item["rounded_bpm"]) - target) <= tolerance
+        for item in estimates
+    )
+
+
+def resolve_halftime_selection(
+    selected: int,
+    scores: dict[int, float],
+    estimates: list[dict[str, Any]],
+    config: dict[str, Any],
+    policy: str,
+) -> tuple[int, str]:
+    if policy not in {"consensus", "prefer-dj-range"}:
+        return selected, "selected_by_policy"
+
+    bpm_config = config.get("bpm_analysis", {})
+    if not bool(bpm_config.get("resolve_halftime_if_supported", True)):
+        return selected, "selected_by_policy"
+
+    preferred_min = int(bpm_config.get("preferred_min", 120))
+    max_tempo = int(bpm_config.get("max_tempo", 260))
+    if selected >= preferred_min:
+        return selected, "selected_by_policy"
+
+    doubled = selected * 2
+    if doubled > max_tempo:
+        return selected, "selected_by_policy"
+
+    doubled_key = nearest_scored_tempo(scores, doubled)
+    if doubled_key is None:
+        return selected, "selected_by_policy"
+
+    selected_score = scores.get(selected, 0.0)
+    doubled_score = scores.get(doubled_key, 0.0)
+    if selected_score <= 0:
+        return selected, "selected_by_policy"
+    if doubled_score >= selected_score * 0.75 and has_direct_tempo_support(estimates, doubled_key):
+        return doubled_key, "halftime_resolved_by_direct_support"
+    return selected, "selected_by_policy"
+
+
+def bpm_candidates_from_scores(
+    selected: int,
+    scores: dict[int, float],
+    config: dict[str, Any],
+) -> list[int]:
+    selected_score = scores.get(selected, 0.0)
+    threshold = max(1.0, selected_score * 0.35)
+    candidates = {
+        tempo
+        for tempo, score in scores.items()
+        if score >= threshold and tempo_in_bounds(tempo, config)
+    }
+    candidates.add(selected)
+    for candidate in bpm_candidates(selected):
+        if candidate in scores and tempo_in_bounds(candidate, config):
+            candidates.add(candidate)
+    return sorted(candidates)
+
+
+def estimate_tempo_from_tempogram(onset_env: Any, sr: int, config: dict[str, Any]) -> list[float]:
+    import librosa
+    import numpy as np
+
+    tempogram = librosa.feature.tempogram(onset_envelope=onset_env, sr=sr)
+    if tempogram.size == 0:
+        return []
+
+    strengths = np.mean(tempogram, axis=1)
+    tempos = librosa.tempo_frequencies(len(strengths), sr=sr)
+    valid: list[tuple[float, float]] = []
+    for tempo, strength in zip(tempos, strengths):
+        if not np.isfinite(tempo) or not np.isfinite(strength):
+            continue
+        rounded = int(round(float(tempo)))
+        if tempo_in_bounds(rounded, config):
+            valid.append((float(strength), float(tempo)))
+
+    valid.sort(reverse=True)
+    result: list[float] = []
+    for _, tempo in valid:
+        rounded = int(round(tempo))
+        if all(abs(rounded - int(round(existing))) > 2 for existing in result):
+            result.append(tempo)
+        if len(result) >= 3:
+            break
+    return result
+
+
+def estimate_tempo_from_onset_intervals(onset_env: Any, sr: int, config: dict[str, Any]) -> list[float]:
+    import librosa
+    import numpy as np
+
+    onsets = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, units="time", backtrack=False)
+    if len(onsets) < 4:
+        return []
+
+    intervals = np.diff(onsets)
+    bpm_config = config.get("bpm_analysis", {})
+    min_tempo = int(bpm_config.get("min_tempo", 60))
+    max_tempo = int(bpm_config.get("max_tempo", 260))
+    min_interval = 60.0 / max_tempo
+    max_interval = 60.0 / min_tempo
+    intervals = intervals[(intervals >= min_interval) & (intervals <= max_interval)]
+    if len(intervals) < 3:
+        return []
+
+    tempos: list[float] = []
+    for label_intervals in [
+        intervals,
+        intervals[intervals <= np.percentile(intervals, 70)],
+    ]:
+        if len(label_intervals) < 3:
+            continue
+        tempo = 60.0 / float(np.median(label_intervals))
+        if tempo_in_bounds(int(round(tempo)), config):
+            tempos.append(tempo)
+
+    rounded = np.rint(60.0 / intervals).astype(int)
+    rounded = rounded[np.array([tempo_in_bounds(int(value), config) for value in rounded])]
+    if len(rounded):
+        values, counts = np.unique(rounded, return_counts=True)
+        tempos.append(float(values[int(np.argmax(counts))]))
+
+    result: list[float] = []
+    for tempo in tempos:
+        if all(abs(int(round(tempo)) - int(round(existing))) > 2 for existing in result):
+            result.append(float(tempo))
+    return result[:3]
+
+
 def estimate_bpm_from_signal(y: Any, sr: int, config: dict[str, Any]) -> BpmEstimate:
     import librosa
     import numpy as np
 
     bpm_config = config.get("bpm_analysis", {})
-    policy = str(bpm_config.get("policy", "raw"))
-    preferred_min = int(bpm_config.get("preferred_min", 120))
-    preferred_max = int(bpm_config.get("preferred_max", 220))
+    policy = str(bpm_config.get("policy", "consensus"))
 
-    onset_env = librosa.onset.onset_strength(y=y, sr=sr)
     estimates: list[dict[str, Any]] = []
 
-    def add_estimate(method: str, value: float | None) -> None:
+    def add_estimate(method: str, value: float | None, signal: str, weight: float = 1.0) -> None:
         if value is None or not np.isfinite(value) or value <= 0:
             return
         rounded = int(round(float(value)))
@@ -415,78 +614,126 @@ def estimate_bpm_from_signal(y: Any, sr: int, config: dict[str, Any]) -> BpmEsti
             estimates.append(
                 {
                     "method": method,
+                    "signal": signal,
                     "bpm": float(value),
                     "rounded_bpm": rounded,
+                    "weight": float(weight),
                 }
             )
 
+    signals: list[tuple[str, Any, float]] = [("full", y, 1.0)]
     try:
-        primary = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=np.median)
-        add_estimate("onset_median", float(primary[0]) if len(primary) else None)
+        _, percussive = librosa.effects.hpss(y)
+        signals.append(("percussive", percussive, 1.15))
     except Exception:
         pass
 
-    try:
-        mean_tempo = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=np.mean)
-        add_estimate("onset_mean", float(mean_tempo[0]) if len(mean_tempo) else None)
-    except Exception:
-        pass
+    for signal_name, signal_y, signal_weight in signals:
+        try:
+            onset_env = librosa.onset.onset_strength(y=signal_y, sr=sr)
+        except Exception:
+            continue
 
-    try:
-        frame_tempos = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=None)
-        if len(frame_tempos):
-            add_estimate("frame_median", float(np.median(frame_tempos)))
-            add_estimate("frame_mode", float(np.bincount(np.rint(frame_tempos).astype(int)).argmax()))
-    except Exception:
-        pass
+        try:
+            primary = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=np.median)
+            add_estimate("tempo_median", float(primary[0]) if len(primary) else None, signal_name, signal_weight)
+        except Exception:
+            pass
+
+        try:
+            mean_tempo = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=np.mean)
+            add_estimate("tempo_mean", float(mean_tempo[0]) if len(mean_tempo) else None, signal_name, signal_weight * 0.85)
+        except Exception:
+            pass
+
+        try:
+            beat_tempo, _ = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr, trim=False)
+            add_estimate("beat_track", float(np.asarray(beat_tempo).reshape(-1)[0]), signal_name, signal_weight)
+        except Exception:
+            pass
+
+        try:
+            frame_tempos = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=None)
+            if len(frame_tempos):
+                rounded_frames = np.rint(frame_tempos).astype(int)
+                rounded_frames = rounded_frames[
+                    np.array([tempo_in_bounds(int(value), config) for value in rounded_frames])
+                ]
+                if len(rounded_frames):
+                    values, counts = np.unique(rounded_frames, return_counts=True)
+                    mode_value = int(values[int(np.argmax(counts))])
+                    add_estimate("frame_mode", float(mode_value), signal_name, signal_weight * 0.8)
+                add_estimate("frame_median", float(np.median(frame_tempos)), signal_name, signal_weight * 0.8)
+        except Exception:
+            pass
+
+        try:
+            for index, tempo in enumerate(estimate_tempo_from_tempogram(onset_env, sr, config)):
+                add_estimate(f"tempogram_peak_{index + 1}", tempo, signal_name, signal_weight * (0.75 - index * 0.1))
+        except Exception:
+            pass
+
+        try:
+            for index, tempo in enumerate(estimate_tempo_from_onset_intervals(onset_env, sr, config)):
+                add_estimate(f"onset_interval_{index + 1}", tempo, signal_name, signal_weight * (2.0 - index * 0.25))
+        except Exception:
+            pass
 
     if not estimates:
         return BpmEstimate(None, None, [], "analysis", policy, [], None, "BPM could not be estimated")
 
-    primary = estimates[0]
-    candidate_values = normalized_bpm_candidates(
-        (item["rounded_bpm"] for item in estimates),
-        config,
-    )
+    if policy == "raw":
+        selected = int(estimates[0]["rounded_bpm"])
+        scores = {selected: float(estimates[0].get("weight", 1.0))}
+        selection_rule = "raw_primary"
+        candidate_values = normalized_bpm_candidates([selected], config)
+    else:
+        selected, scores = score_tempo_estimates(estimates, config, policy)
+        if selected is None:
+            return BpmEstimate(None, None, [], "analysis", policy, estimates, None, "BPM could not be selected")
+        selected, selection_rule = resolve_halftime_selection(selected, scores, estimates, config, policy)
+        candidate_values = bpm_candidates_from_scores(selected, scores, config)
 
-    selected = int(primary["rounded_bpm"])
-    if policy == "prefer-dj-range":
-        scores: dict[int, float] = {}
-        for item in estimates:
-            rounded = int(item["rounded_bpm"])
-            scores[rounded] = scores.get(rounded, 0.0) + 1.0
-            for candidate in bpm_candidates(rounded):
-                if candidate != rounded and tempo_in_bounds(candidate, config):
-                    scores[candidate] = scores.get(candidate, 0.0) + 0.85
-        for candidate in list(scores):
-            if preferred_min <= candidate <= preferred_max:
-                scores[candidate] += 0.4
-        selected = sorted(
-            scores,
-            key=lambda value: (
-                -scores[value],
-                abs(value - int(primary["rounded_bpm"])),
-                value,
-            ),
-        )[0]
-
-    if selected not in candidate_values:
-        candidate_values.append(selected)
-        candidate_values.sort()
-
-    support = sum(1 for item in estimates if int(item["rounded_bpm"]) == selected)
+    for item in estimates:
+        item["score_for_selected"] = round(
+            float(item.get("weight", 1.0))
+            if abs(int(item["rounded_bpm"]) - selected) <= 2
+            else 0.0,
+            4,
+        )
+    score_total = sum(scores.values())
+    selected_score = scores.get(selected, 0.0)
+    score_share = selected_score / score_total if score_total else 0.0
+    support = sum(1 for item in estimates if abs(int(item["rounded_bpm"]) - selected) <= 2)
     scaled_support = sum(
         1
         for item in estimates
         if selected in bpm_candidates(int(item["rounded_bpm"]))
         and int(item["rounded_bpm"]) != selected
     )
-    if support >= 2:
+    if support >= 3 and score_share >= 0.45:
         confidence = "high"
-    elif support == 1 or scaled_support >= 2:
+    elif support >= 2 or scaled_support >= 2 or score_share >= 0.30:
         confidence = "medium"
     else:
         confidence = "low"
+
+    alternatives = sorted(
+        estimates,
+        key=lambda item: (
+            abs(int(item["rounded_bpm"]) - selected) > 2,
+            -float(item.get("weight", 1.0)),
+            item["method"],
+        ),
+    )
+    alternatives.append(
+        {
+            "method": "consensus_scores",
+            "scores": {str(key): round(value, 4) for key, value in sorted(scores.items())},
+            "selected_score_share": round(score_share, 4),
+            "selection_rule": selection_rule,
+        }
+    )
 
     selected_float = float(selected)
     return BpmEstimate(
@@ -495,7 +742,7 @@ def estimate_bpm_from_signal(y: Any, sr: int, config: dict[str, Any]) -> BpmEsti
         candidates=candidate_values,
         source="analysis",
         policy=policy,
-        alternatives=estimates,
+        alternatives=alternatives,
         confidence=confidence,
     )
 
@@ -828,8 +1075,13 @@ def main() -> int:
     parser.add_argument("--limit", type=int, help="Analyze at most this many files")
     parser.add_argument(
         "--bpm-policy",
-        choices=["raw", "prefer-dj-range"],
+        choices=["consensus", "raw", "prefer-dj-range"],
         help="Override bpm_analysis.policy for this run",
+    )
+    parser.add_argument(
+        "--use-bpm-overrides",
+        action="store_true",
+        help="Use explicit bpm_overrides.json values instead of analysis when they match",
     )
     args = parser.parse_args()
 
@@ -838,7 +1090,7 @@ def main() -> int:
     config = load_config(root, args.config)
     if args.bpm_policy:
         config.setdefault("bpm_analysis", {})["policy"] = args.bpm_policy
-    bpm_overrides = load_bpm_overrides(root, config)
+    bpm_overrides = load_bpm_overrides(root, config) if args.use_bpm_overrides else {"hash": [], "filename": [], "path": []}
     log_path = root / config["log_file"]
     extensions = {ext.lower() for ext in config["audio_extensions"]}
     files = iter_audio_files(input_path, extensions)

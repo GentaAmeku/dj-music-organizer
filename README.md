@@ -122,34 +122,37 @@ cd /path/to/dj-music-organizer
 
 `--apply` でも確認プロンプトが出ます。確認なしの `--apply --yes` は、明示的に必要なときだけ使います。
 
-## BPM解析とrekordbox補正
+## BPM解析
 
-BPMは推定値です。既定では解析器が選んだBPMをそのまま使います。半分/倍の候補はログに残しますが、物理フォルダやファイル名は自動補正しません。
+BPMは推定値です。既定では `consensus` ポリシーを使い、複数の解析結果を合議してBPMを選びます。
 
-DJ用途のテンポ帯を優先して試す場合は、プレビュー実行で明示します。
+現在のBPM解析では、以下を組み合わせます。
+
+- 全体音源のオンセット解析
+- 打楽器成分のオンセット解析
+- beat tracking
+- tempogram
+- 隣接オンセット間隔
+- 半速/倍速候補の根拠付き解消
+
+解析結果には、選ばれたBPMだけでなく、候補、解析ポリシー、信頼度、代替候補もログに残します。
+
+単純な従来方式を確認したい場合は、プレビュー実行で明示します。
+
+```bash
+.venv/bin/python tools/dj_music_organizer.py --input "/path/to/DJ Music/00_Inbox" --limit 10 --bpm-policy raw
+```
+
+DJ向けのテンポ帯を強めに優先して試す場合は、以下を使います。
 
 ```bash
 .venv/bin/python tools/dj_music_organizer.py --input "/path/to/DJ Music/00_Inbox" --limit 10 --bpm-policy prefer-dj-range
 ```
 
-rekordboxで解析したBPMを正として使いたい場合は、rekordboxのXMLまたはCSVを書き出して `bpm_overrides.json` を作ります。
+rekordbox XML/CSV取り込みツールは残していますが、通常のBPM解析には使いません。`bpm_overrides.json` が存在しても、`--use-bpm-overrides` を明示しない限り整理結果には反映されません。
 
 ```bash
-.venv/bin/python tools/dj_import_rekordbox_bpm.py --rekordbox-export "/path/to/rekordbox.xml" --library-root "/path/to/DJ Music" --apply
-```
-
-`bpm_overrides.json` がある場合、以後の整理では一致した曲のBPMにrekordbox値を使います。
-
-既に `01_Analyzed` に入っている曲をrekordbox値で移動・リネームする場合は、まずプレビューします。
-
-```bash
-.venv/bin/python tools/dj_apply_bpm_overrides.py --library-root "/path/to/DJ Music"
-```
-
-問題なければ適用します。
-
-```bash
-.venv/bin/python tools/dj_apply_bpm_overrides.py --library-root "/path/to/DJ Music" --apply
+.venv/bin/python tools/dj_music_organizer.py --input "/path/to/DJ Music/00_Inbox" --use-bpm-overrides
 ```
 
 ## コレクション別BPMプレイリスト生成
@@ -263,7 +266,7 @@ CSVよりJSONとMarkdownを優先します。
 - 解析に失敗しても全体を止めない
 - `PIONEER`、`.Spotlight-V100`、`System Volume Information`、`._*` は触らない
 - BPM/Keyは推定値として扱う
-- rekordbox由来のBPM補正は `bpm_overrides.json` に明示的に残す
+- 外部BPM補正は明示フラグなしに通常解析へ混ぜない
 - Keyが怪しい場合に自動補正しない
 
 ## ドキュメント
@@ -277,7 +280,7 @@ CSVよりJSONとMarkdownを優先します。
 ## 現在の制約
 
 - Key推定は簡易実装です。精度は今後改善します。
-- BPM推定も完全ではありません。rekordboxとのズレは `bpm_overrides.json` で補正する前提です。
+- BPM推定も完全ではありません。ズレが出た場合は解析ロジックと候補根拠を見直します。
 - `--reanalyze-unknown-key` は設計済みですが、まだ本格実装前です。
 - rekordboxでの `.m3u8` 相対パス挙動は実機確認が必要です。
 - USB書き出しは削除同期しません。

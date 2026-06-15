@@ -9,11 +9,12 @@
   "max_filename_length": 180,
   "audio_extensions": [".wav", ".aiff", ".aif", ".mp3", ".m4a", ".flac"],
   "bpm_analysis": {
-    "policy": "raw",
+    "policy": "consensus",
     "preferred_min": 120,
     "preferred_max": 220,
     "min_tempo": 60,
-    "max_tempo": 260
+    "max_tempo": 260,
+    "resolve_halftime_if_supported": true
   },
   "bpm_ranges": [
     {"name": "Under100", "min": null, "max": 99},

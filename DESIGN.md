@@ -101,22 +101,25 @@ Rules:
 
 - Round BPM to the nearest integer for file names and folder placement.
 - Store the selected floating BPM, rounded BPM, candidate BPMs, analysis policy, source, alternatives, and confidence in the log.
-- Keep the default BPM policy as `raw`; do not silently force half/double correction.
+- Keep the default BPM policy as `consensus`.
+- Use multiple internal analysis signals before selecting BPM.
 - Allow an explicit `prefer-dj-range` policy for previewing DJ-friendly half/double choices.
-- Allow rekordbox-derived BPM overrides through `bpm_overrides.json`.
+- Keep external BPM overrides out of normal analysis unless explicitly requested.
 - Show candidate tempos such as `87 / 174` in dry-run output.
 - Do not force Camelot conversion when major/minor is unknown.
 - Continue processing other files when one file fails.
 
-### BPM correction workflow
+### BPM analysis workflow
 
-The audio analyzer is a helper, not the source of truth.
+The primary goal is to make the program's own BPM analysis as accurate as practical.
 
-If rekordbox reports a meaningfully different BPM, import that value into `bpm_overrides.json`.
-Future organizer runs use matching overrides before the analyzer result for file naming and BPM folder placement.
+The analyzer should combine full-audio onset strength, percussive onset strength, beat tracking, tempogram peaks, and adjacent onset intervals.
 
-Existing files under `01_Analyzed` may be corrected by moving and renaming them from `bpm_overrides.json`.
-Such corrections append `bpm_corrected` log entries so playlist generation can follow the new destination path.
+Half-time and double-time ambiguity should be resolved only when the internal evidence supports it.
+For example, if the consensus result is below the preferred DJ tempo range but a doubled tempo has strong direct support from onset intervals or the tempogram, the analyzer may select the doubled tempo.
+
+rekordbox import remains an optional comparison or manual-correction tool.
+It must not affect normal organizer runs unless `--use-bpm-overrides` is explicitly passed.
 
 ## Apply Behavior
 
